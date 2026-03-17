@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>حياتي — المهام</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+<div class="app-layout">
+  <main class="main-content">
+    <div class="container">
+
+      <div class="page-header animate-fade-in">
+        <div>
+          <h1 class="page-title">المهام</h1>
+          <p class="page-subtitle" id="task-date-label"></p>
+        </div>
+        <button class="btn btn-primary" onclick="modal.open('add-task-modal')">
+          <span>＋</span> مهمة جديدة
+        </button>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-lg);background:var(--bg-card);padding:4px;border-radius:var(--radius-lg);border:1px solid var(--border);">
+        <button class="btn tab-btn active" data-tab="daily" onclick="switchTab('daily')" style="flex:1;">📅 يومية</button>
+        <button class="btn tab-btn" data-tab="monthly" onclick="switchTab('monthly')" style="flex:1;">📆 شهرية</button>
+      </div>
+
+      <!-- Monthly Reminder Banner -->
+      <div id="monthly-banner" class="hidden">
+        <div class="monthly-reminder mb-md">
+          <div class="reminder-icon">📅</div>
+          <div>
+            <div class="reminder-text" id="monthly-reminder-text"></div>
+            <div class="text-sm text-muted">مهام الشهر الجارية</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Date Navigator -->
+      <div id="date-nav" style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:var(--space-lg);">
+        <button class="btn btn-ghost btn-icon" onclick="changeDate(-1)">◀</button>
+        <input type="date" class="form-input" id="date-picker" style="flex:1;text-align:center;" />
+        <button class="btn btn-ghost btn-icon" onclick="changeDate(1)">▶</button>
+        <button class="btn btn-secondary btn-sm" onclick="goToToday()">اليوم</button>
+      </div>
+
+      <!-- Progress Bar -->
+      <div id="task-progress-section" style="margin-bottom:var(--space-lg);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:var(--space-xs);">
+          <span class="text-sm text-muted">الإنجاز</span>
+          <span class="text-sm font-bold" id="progress-label">0/0</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="task-progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Tasks List -->
+      <div id="tasks-container" class="stagger-children"></div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Add Task Modal -->
+<div class="modal-overlay" id="add-task-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" data-modal-close>✕</button>
+    <h2 class="modal-title">مهمة جديدة</h2>
+    <form id="task-form">
+      <div class="form-group">
+        <label class="form-label">عنوان المهمة *</label>
+        <input type="text" class="form-input" id="task-title" placeholder="ماذا تريد أن تنجز؟" required maxlength="200" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">الوصف (اختياري)</label>
+        <textarea class="form-textarea" id="task-desc" placeholder="تفاصيل إضافية..." style="min-height:80px;"></textarea>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">الأولوية</label>
+          <select class="form-select" id="task-priority">
+            <option value="منخفض">🟢 منخفض</option>
+            <option value="متوسط" selected>🟡 متوسط</option>
+            <option value="عالي">🔴 عالي</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">النوع</label>
+          <select class="form-select" id="task-type">
+            <option value="يومي">📅 يومي</option>
+            <option value="أسبوعي">📆 أسبوعي</option>
+            <option value="شهري">🗓️ شهري</option>
+            <option value="مرة واحدة">1️⃣ مرة واحدة</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">تاريخ الاستحقاق</label>
+        <input type="date" class="form-input" id="task-due" />
+      </div>
+      <div style="display:flex;gap:var(--space-sm);">
+        <button type="submit" class="btn btn-primary" style="flex:1;" id="save-task-btn">حفظ المهمة</button>
+        <button type="button" class="btn btn-secondary" data-modal-close>إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+let currentDate = dateUtils.today();
+let currentTab = 'daily';
+let editingTaskId = null;
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active', 'btn-primary'));
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active', 'btn-primary');
+  document.getElementById('date-nav').style.display = tab === 'daily' ? 'flex' : 'none';
+  document.getElementById('task-progress-section').style.display = tab === 'daily' ? 'block' : 'block';
+  loadTasks();
+}
+
+async function loadTasks() {
+  const container = document.getElementById('tasks-container');
+  ui.skeleton(container, 4);
+
+  try {
+    let data;
+    if (currentTab === 'daily') {
+      document.getElementById('task-date-label').textContent = dateUtils.formatArabic(currentDate);
+      data = await api.get(`/tasks?date=${currentDate}`);
+      renderTasks(data.tasks);
+      updateProgress(data.tasks);
+    } else {
+      const month = new Date().toISOString().slice(0, 7);
+      document.getElementById('task-date-label').textContent = 'مهام الشهر الجاري';
+      data = await api.get(`/tasks/monthly?month=${month}`);
+      renderTasks(data.tasks, true);
+      updateProgress(data.tasks);
+      showMonthlyReminder(data.tasks);
+    }
+  } catch(e) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${e.message}</div></div>`;
+  }
+}
+
+function renderTasks(tasks, isMonthly = false) {
+  const container = document.getElementById('tasks-container');
+  if (!tasks?.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📋</div>
+        <div class="empty-state-title">لا توجد مهام</div>
+        <div class="empty-state-desc">اضغط "مهمة جديدة" لإضافة مهمة</div>
+      </div>
+    `;
+    return;
+  }
+
+  const priorityColors = { 'عالي': 'badge-danger', 'متوسط': 'badge-warning', 'منخفض': 'badge-muted' };
+
+  container.innerHTML = tasks.map(t => `
+    <div class="task-item ${t.completed ? 'completed' : ''}" data-id="${t._id}" style="position:relative;">
+      <label class="checkbox-toggle">
+        <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask('${t._id}', this.checked)">
+        <div class="checkbox-box"></div>
+      </label>
+      <div style="flex:1;min-width:0;">
+        <div class="task-title">${t.title}</div>
+        ${t.description ? `<div class="text-sm text-muted" style="margin-top:2px;">${t.description}</div>` : ''}
+        ${t.dueDate ? `<div class="text-sm" style="margin-top:2px;color:var(--gold);">📅 ${dateUtils.formatShort(t.dueDate)}</div>` : ''}
+      </div>
+      <div class="task-meta">
+        <span class="badge ${priorityColors[t.priority] || 'badge-muted'}">${t.priority}</span>
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button class="btn btn-ghost btn-icon btn-sm" onclick="deleteTask('${t._id}')" title="حذف">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateProgress(tasks) {
+  if (!tasks?.length) { document.getElementById('task-progress-fill').style.width = '0%'; document.getElementById('progress-label').textContent = '0/0'; return; }
+  const done = tasks.filter(t => t.completed).length;
+  const pct = Math.round((done / tasks.length) * 100);
+  document.getElementById('task-progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${done}/${tasks.length}`;
+}
+
+function showMonthlyReminder(tasks) {
+  const pending = tasks.filter(t => !t.completed);
+  const banner = document.getElementById('monthly-banner');
+  if (pending.length > 0) {
+    document.getElementById('monthly-reminder-text').textContent = `${pending.length} مهمة شهرية معلقة`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+async function toggleTask(id, completed) {
+  try {
+    await api.put(`/tasks/${id}`, { completed });
+    toast.success(completed ? '✓ تم الإنجاز' : 'تم إعادة الفتح');
+    loadTasks();
+  } catch(e) { toast.error(e.message); }
+}
+
+async function deleteTask(id) {
+  if (!confirm('هل تريد حذف هذه المهمة؟')) return;
+  try {
+    await api.delete(`/tasks/${id}`);
+    toast.success('تم الحذف');
+    loadTasks();
+  } catch(e) { toast.error(e.message); }
+}
+
+function changeDate(days) {
+  const d = new Date(currentDate);
+  d.setDate(d.getDate() + days);
+  currentDate = d.toISOString().split('T')[0];
+  document.getElementById('date-picker').value = currentDate;
+  loadTasks();
+}
+
+function goToToday() {
+  currentDate = dateUtils.today();
+  document.getElementById('date-picker').value = currentDate;
+  loadTasks();
+}
+
+document.getElementById('task-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('save-task-btn');
+  ui.setLoading(btn, true);
+  const typeVal = document.getElementById('task-type').value;
+  const payload = {
+    title: document.getElementById('task-title').value,
+    description: document.getElementById('task-desc').value,
+    priority: document.getElementById('task-priority').value,
+    type: typeVal,
+    date: currentTab === 'monthly' ? dateUtils.today() : currentDate,
+    dueDate: document.getElementById('task-due').value || undefined
+  };
+  try {
+    await api.post('/tasks', payload);
+    toast.success('تم إضافة المهمة ✓');
+    modal.close('add-task-modal');
+    e.target.reset();
+    loadTasks();
+  } catch(err) { toast.error(err.message); }
+  finally { ui.setLoading(btn, false); }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildNav();
+  document.getElementById('date-picker').value = currentDate;
+  document.getElementById('date-picker').addEventListener('change', (e) => {
+    currentDate = e.target.value;
+    loadTasks();
+  });
+  loadTasks();
+});
+</script>
+</body>
+</html>

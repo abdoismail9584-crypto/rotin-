@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>حياتي — إنشاء حساب</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card animate-fade-in">
+      <div class="auth-logo">
+        <div class="auth-logo-icon">✨</div>
+        <h1 class="auth-title">ابدأ رحلتك</h1>
+        <p class="auth-subtitle">إنشاء حساب جديد في حياتي</p>
+      </div>
+
+      <form id="register-form">
+        <div class="form-group">
+          <label class="form-label">الاسم الكامل</label>
+          <input type="text" class="form-input" id="name" placeholder="اسمك الكامل" required maxlength="50" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">البريد الإلكتروني</label>
+          <input type="email" class="form-input" id="email" placeholder="example@email.com" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">كلمة المرور</label>
+          <input type="password" class="form-input" id="password" placeholder="٦ أحرف على الأقل" required minlength="6" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">تأكيد كلمة المرور</label>
+          <input type="password" class="form-input" id="confirm-password" placeholder="أعد كتابة كلمة المرور" required />
+        </div>
+        <div id="error-msg" class="hidden" style="color:var(--danger);font-size:var(--font-size-sm);margin-bottom:var(--space-md);text-align:center;padding:var(--space-sm);background:rgba(245,101,101,0.1);border-radius:var(--radius-sm);border:1px solid rgba(245,101,101,0.3);"></div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="register-btn">
+          إنشاء الحساب
+        </button>
+      </form>
+
+      <div class="divider" style="margin:var(--space-xl) 0;"></div>
+      <p style="text-align:center;font-size:var(--font-size-sm);color:var(--text-muted);">
+        لديك حساب بالفعل؟
+        <a href="/login.html" style="color:var(--pink-400);font-weight:700;margin-right:4px;">تسجيل الدخول</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('register-btn');
+      const err = document.getElementById('error-msg');
+      err.classList.add('hidden');
+      const pw = document.getElementById('password').value;
+      const cpw = document.getElementById('confirm-password').value;
+      if (pw !== cpw) {
+        err.textContent = 'كلمتا المرور غير متطابقتين';
+        err.classList.remove('hidden');
+        return;
+      }
+      ui.setLoading(btn, true);
+      try {
+        const data = await api.post('/auth/register', {
+          name: document.getElementById('name').value,
+          email: document.getElementById('email').value,
+          password: pw
+        });
+        auth.setSession(data.token, data.user);
+        location.href = '/dashboard.html';
+      } catch (error) {
+        err.textContent = error.message;
+        err.classList.remove('hidden');
+      } finally {
+        ui.setLoading(btn, false);
+      }
+    });
+  </script>
+</body>
+</html>

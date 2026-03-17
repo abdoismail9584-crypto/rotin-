@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>حياتي — لوحة التحكم</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+<div class="app-layout">
+  <main class="main-content">
+    <div class="container">
+
+      <!-- Greeting Banner -->
+      <div class="greeting-banner animate-fade-in" id="greeting-banner">
+        <div class="greeting-name" id="greeting-text">أهلاً...</div>
+        <div class="greeting-date" id="greeting-date"></div>
+        <div style="margin-top:var(--space-md);" id="quote-text"></div>
+      </div>
+
+      <!-- Monthly Reminders -->
+      <div id="monthly-reminders" class="hidden mb-md"></div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid stagger-children" id="stats-grid">
+        <div class="stat-card skeleton" style="height:90px;"></div>
+        <div class="stat-card skeleton" style="height:90px;"></div>
+        <div class="stat-card skeleton" style="height:90px;"></div>
+        <div class="stat-card skeleton" style="height:90px;"></div>
+      </div>
+
+      <!-- Prayer Tracker -->
+      <div class="card mb-md animate-fade-in">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background:rgba(139,26,74,0.2);">🤲</div>
+            الصلوات اليومية
+          </div>
+          <a href="/prayers.html" class="btn btn-ghost btn-sm">عرض الكل</a>
+        </div>
+        <div class="prayers-row" id="prayers-row">
+          ${['الفجر','الظهر','العصر','المغرب','العشاء'].map(p => `
+            <div class="prayer-dot skeleton" style="width:44px;height:44px;"></div>
+          `).join('')}
+        </div>
+        <div class="progress-bar mt-md">
+          <div class="progress-fill" id="prayer-progress" style="width:0%"></div>
+        </div>
+        <div class="text-sm text-muted mt-sm" id="prayer-count">جاري التحميل...</div>
+      </div>
+
+      <!-- Tasks Today -->
+      <div class="card mb-md">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background:rgba(104,201,160,0.15);">✅</div>
+            مهام اليوم
+          </div>
+          <a href="/tasks.html" class="btn btn-ghost btn-sm">إدارة المهام</a>
+        </div>
+        <div id="tasks-list">
+          <div class="skeleton" style="height:52px;margin-bottom:8px;border-radius:12px;"></div>
+          <div class="skeleton" style="height:52px;margin-bottom:8px;border-radius:12px;"></div>
+          <div class="skeleton" style="height:52px;border-radius:12px;"></div>
+        </div>
+      </div>
+
+      <!-- Two Column: Habits + Debts -->
+      <div class="grid-2">
+        <!-- Habits -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background:rgba(212,175,122,0.15);">⭐</div>
+              العادات
+            </div>
+            <a href="/habits.html" class="btn btn-ghost btn-sm">كل العادات</a>
+          </div>
+          <div id="habits-list">
+            <div class="skeleton" style="height:44px;margin-bottom:8px;border-radius:10px;"></div>
+            <div class="skeleton" style="height:44px;border-radius:10px;"></div>
+          </div>
+        </div>
+
+        <!-- Debts Summary -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background:rgba(245,101,101,0.1);">💰</div>
+              الديون
+            </div>
+            <a href="/debts.html" class="btn btn-ghost btn-sm">إدارة</a>
+          </div>
+          <div id="debts-summary">
+            <div class="skeleton" style="height:44px;margin-bottom:8px;border-radius:10px;"></div>
+            <div class="skeleton" style="height:44px;border-radius:10px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Journal Quick Entry -->
+      <div class="card mt-md">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background:rgba(99,179,237,0.1);">📓</div>
+            يومية اليوم
+          </div>
+          <a href="/journal.html" class="btn btn-ghost btn-sm">فتح اليوميات</a>
+        </div>
+        <div id="journal-preview">
+          <div class="skeleton" style="height:60px;border-radius:10px;"></div>
+        </div>
+      </div>
+
+    </div><!-- /container -->
+  </main>
+</div><!-- /app-layout -->
+
+<script src="/js/app.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+const PRAYERS_AR = { fajr:'الفجر', dhuhr:'الظهر', asr:'العصر', maghrib:'المغرب', isha:'العشاء' };
+const PRAYER_KEYS = ['fajr','dhuhr','asr','maghrib','isha'];
+const QUOTES = [
+  'اليوم فرصة جديدة لتكون أفضل من الأمس 🌱',
+  'النجاح ليس حظاً، بل هو نتيجة عادات يومية صغيرة ✨',
+  'ابدأ بالخطوة الأولى، والطريق سيتضح 🛤️',
+  'كل يوم تكتبه في يومياتك هو فصل من كتاب حياتك 📖',
+  'الانضباط حرية حقيقية 🕊️'
+];
+
+let dashData = null;
+
+async function loadDashboard() {
+  const today = dateUtils.today();
+
+  // Greeting
+  const user = auth.getUser();
+  document.getElementById('greeting-text').textContent = `${dateUtils.getGreeting()} ${user?.name?.split(' ')[0] || ''}`;
+  document.getElementById('greeting-date').textContent = dateUtils.formatArabic(today);
+  document.getElementById('quote-text').innerHTML = `<p style="color:var(--text-muted);font-size:var(--font-size-sm);">${QUOTES[new Date().getDay() % QUOTES.length]}</p>`;
+
+  try {
+    dashData = await api.get(`/dashboard?date=${today}`);
+    renderStats(dashData.summary);
+    renderPrayers(dashData.prayers, today);
+    renderTasks(dashData.tasks);
+    renderHabits(dashData.habits, today);
+    renderDebts(dashData.summary.debts, dashData.recentDebts);
+    renderJournal(dashData.journal);
+    checkMonthlyReminders();
+  } catch(e) {
+    toast.error('تعذر تحميل البيانات: ' + e.message);
+  }
+}
+
+function renderStats(s) {
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-value">${s.tasks.completed}/${s.tasks.total}</div>
+      <div class="stat-label">المهام المنجزة</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🤲</div>
+      <div class="stat-value">${s.prayers.completed}/5</div>
+      <div class="stat-label">الصلوات</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⭐</div>
+      <div class="stat-value">${s.habits.completed}/${s.habits.total}</div>
+      <div class="stat-label">العادات</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💰</div>
+      <div class="stat-value">${s.debts.activeDebts}</div>
+      <div class="stat-label">ديون نشطة</div>
+    </div>
+  `;
+}
+
+function renderPrayers(prayers, today) {
+  const row = document.getElementById('prayers-row');
+  const count = document.getElementById('prayer-count');
+  const progress = document.getElementById('prayer-progress');
+
+  let completed = 0;
+  row.innerHTML = PRAYER_KEYS.map(key => {
+    const done = prayers?.[key]?.completed || false;
+    if (done) completed++;
+    return `
+      <div class="prayer-dot ${done ? 'completed' : ''}" data-prayer="${key}" data-date="${today}" title="${PRAYERS_AR[key]}">
+        <span style="font-size:8px;line-height:1;">${PRAYERS_AR[key]}</span>
+        <span>${done ? '✓' : '○'}</span>
+      </div>
+    `;
+  }).join('');
+
+  progress.style.width = `${(completed / 5) * 100}%`;
+  count.textContent = `${completed} من 5 صلوات`;
+
+  row.querySelectorAll('.prayer-dot').forEach(dot => {
+    dot.addEventListener('click', () => togglePrayer(dot, today));
+  });
+}
+
+async function togglePrayer(dot, today) {
+  const key = dot.dataset.prayer;
+  const done = dot.classList.contains('completed');
+  try {
+    const data = await api.put(`/prayers/${today}`, { [key]: { completed: !done } });
+    renderPrayers(data.prayers, today);
+    toast.success(done ? `${PRAYERS_AR[key]} تم إلغاء التأشير` : `${PRAYERS_AR[key]} ✓ تم تسجيلها`);
+  } catch(e) { toast.error(e.message); }
+}
+
+function renderTasks(tasks) {
+  const list = document.getElementById('tasks-list');
+  if (!tasks?.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">لا توجد مهام اليوم</div><div class="empty-state-desc"><a href="/tasks.html">أضف مهمة جديدة</a></div></div>`;
+    return;
+  }
+  list.innerHTML = tasks.slice(0, 5).map(t => `
+    <div class="task-item ${t.completed ? 'completed' : ''}" data-id="${t._id}">
+      <label class="checkbox-toggle">
+        <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask('${t._id}', this.checked)">
+        <div class="checkbox-box"></div>
+      </label>
+      <span class="task-title">${t.title}</span>
+      <div class="task-meta">
+        ${t.priority === 'عالي' ? '<span class="badge badge-danger">عالي</span>' : ''}
+        ${t.type === 'شهري' ? '<span class="badge badge-warning">شهري</span>' : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleTask(id, completed) {
+  try {
+    await api.put(`/tasks/${id}`, { completed });
+    toast.success(completed ? 'تم إتمام المهمة ✓' : 'تم إعادة فتح المهمة');
+    const item = document.querySelector(`.task-item[data-id="${id}"]`);
+    if (item) item.classList.toggle('completed', completed);
+  } catch(e) { toast.error(e.message); }
+}
+
+function renderHabits(habits, today) {
+  const list = document.getElementById('habits-list');
+  if (!habits?.length) {
+    list.innerHTML = `<div class="empty-state" style="padding:var(--space-lg)"><div class="empty-state-title">لا توجد عادات</div></div>`;
+    return;
+  }
+  list.innerHTML = habits.slice(0, 4).map(h => `
+    <div class="habit-item" data-id="${h._id}">
+      <div class="habit-icon">${h.icon}</div>
+      <div class="habit-info">
+        <div class="habit-name ${h.todayCompleted ? 'text-muted' : ''}" style="${h.todayCompleted ? 'text-decoration:line-through;' : ''}">${h.title}</div>
+        <div class="habit-streak">🔥 ${h.streak} يوم متواصل</div>
+      </div>
+      <label class="checkbox-toggle">
+        <input type="checkbox" ${h.todayCompleted ? 'checked' : ''} onchange="toggleHabit('${h._id}', '${today}', this.checked)">
+        <div class="checkbox-box"></div>
+      </label>
+    </div>
+  `).join('');
+}
+
+async function toggleHabit(id, date, completed) {
+  try {
+    await api.put(`/habits/${id}/complete`, { date, completed });
+    toast.success(completed ? 'عادة منجزة ✓' : 'تم الإلغاء');
+    loadDashboard();
+  } catch(e) { toast.error(e.message); }
+}
+
+function renderDebts(summary, debts) {
+  const el = document.getElementById('debts-summary');
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:var(--space-sm);">
+      <div style="display:flex;justify-content:space-between;padding:var(--space-sm) var(--space-md);background:rgba(245,101,101,0.08);border-radius:var(--radius-md);border:1px solid rgba(245,101,101,0.2);">
+        <span class="text-sm">أنا مدين</span>
+        <span class="debt-owe font-bold">${summary.totalOwe.toLocaleString('ar-EG')} ج.م</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:var(--space-sm) var(--space-md);background:rgba(104,201,160,0.08);border-radius:var(--radius-md);border:1px solid rgba(104,201,160,0.2);">
+        <span class="text-sm">مدين لي</span>
+        <span class="debt-owed font-bold">${summary.totalOwed.toLocaleString('ar-EG')} ج.م</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderJournal(journal) {
+  const el = document.getElementById('journal-preview');
+  if (!journal) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:var(--space-md);">
+        <div style="color:var(--text-muted);font-size:var(--font-size-sm);margin-bottom:var(--space-sm);">لم تكتب يوميتك بعد</div>
+        <a href="/journal.html" class="btn btn-secondary btn-sm">📝 اكتب الآن</a>
+      </div>
+    `;
+    return;
+  }
+  const moods = { 'ممتاز':'😄', 'جيد':'😊', 'عادي':'😐', 'سيء':'😕', 'سيء جداً':'😢' };
+  el.innerHTML = `
+    <div style="display:flex;gap:var(--space-sm);align-items:flex-start;">
+      <span style="font-size:24px;">${moods[journal.mood] || '😐'}</span>
+      <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.7;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">${journal.content}</p>
+    </div>
+  `;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildNav();
+  loadDashboard();
+});
+</script>
+</body>
+</html>

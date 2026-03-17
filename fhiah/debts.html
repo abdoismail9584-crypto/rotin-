@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>حياتي — الديون</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .debt-card {
+      padding: var(--space-lg);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      margin-bottom: var(--space-md);
+      transition: all var(--transition-base);
+    }
+    .debt-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .debt-card.settled { opacity: 0.5; }
+    .debt-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-sm); }
+    .debt-person-row { display: flex; align-items: center; gap: var(--space-sm); }
+    .debt-avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 800; }
+    .summary-card {
+      border-radius: var(--radius-xl);
+      padding: var(--space-xl);
+      text-align: center;
+      border: 1px solid;
+    }
+    .summary-owe  { background: rgba(245,101,101,0.08); border-color: rgba(245,101,101,0.2); }
+    .summary-owed { background: rgba(104,201,160,0.08); border-color: rgba(104,201,160,0.2); }
+    .summary-amount { font-size: var(--font-size-2xl); font-weight: 900; }
+    .filter-tabs { display: flex; gap: 4px; background: var(--bg-card); padding: 4px; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-bottom: var(--space-lg); }
+    .filter-tab { flex: 1; padding: 8px; border: none; border-radius: var(--radius-md); background: transparent; color: var(--text-muted); font-family: var(--font-body); font-size: var(--font-size-sm); font-weight: 600; cursor: pointer; transition: all var(--transition-fast); }
+    .filter-tab.active { background: var(--bg-elevated); color: var(--text-primary); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <main class="main-content">
+    <div class="container">
+
+      <div class="page-header animate-fade-in">
+        <div>
+          <h1 class="page-title">الديون</h1>
+          <p class="page-subtitle">تتبع ما لك وما عليك</p>
+        </div>
+        <button class="btn btn-primary" onclick="modal.open('add-debt-modal')">
+          <span>＋</span> دين جديد
+        </button>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="grid-2 mb-lg animate-fade-in">
+        <div class="summary-card summary-owe">
+          <div style="font-size:28px;margin-bottom:4px;">😟</div>
+          <div class="summary-amount debt-owe" id="total-owe">0</div>
+          <div class="text-sm text-muted mt-sm">أنا مدين</div>
+        </div>
+        <div class="summary-card summary-owed">
+          <div style="font-size:28px;margin-bottom:4px;">😊</div>
+          <div class="summary-amount debt-owed" id="total-owed">0</div>
+          <div class="text-sm text-muted mt-sm">مدين لي</div>
+        </div>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all" onclick="setFilter('all')">الكل</button>
+        <button class="filter-tab" data-filter="أنا مدين" onclick="setFilter('أنا مدين')">أنا مدين</button>
+        <button class="filter-tab" data-filter="مدين لي" onclick="setFilter('مدين لي')">مدين لي</button>
+        <button class="filter-tab" data-filter="مسدد" onclick="setFilter('مسدد')">مسدّدة</button>
+      </div>
+
+      <!-- Debts List -->
+      <div id="debts-container" class="stagger-children"></div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Add Debt Modal -->
+<div class="modal-overlay" id="add-debt-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" data-modal-close>✕</button>
+    <h2 class="modal-title">إضافة دين جديد</h2>
+    <form id="debt-form">
+      <div class="form-group">
+        <label class="form-label">اسم الشخص *</label>
+        <input type="text" class="form-input" id="debt-person" placeholder="من هو الشخص؟" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">نوع الدين *</label>
+        <div style="display:flex;gap:var(--space-sm);">
+          <label style="flex:1;cursor:pointer;">
+            <input type="radio" name="debt-type" value="أنا مدين" checked style="display:none;" id="type-owe" />
+            <div class="debt-type-btn" id="btn-owe" style="padding:var(--space-md);border-radius:var(--radius-md);border:2px solid var(--pink-400);background:rgba(232,115,154,0.1);text-align:center;font-weight:700;color:var(--danger);">
+              😟 أنا مدين
+            </div>
+          </label>
+          <label style="flex:1;cursor:pointer;">
+            <input type="radio" name="debt-type" value="مدين لي" style="display:none;" id="type-owed" />
+            <div class="debt-type-btn" id="btn-owed" style="padding:var(--space-md);border-radius:var(--radius-md);border:2px solid var(--border);background:var(--bg-secondary);text-align:center;font-weight:700;color:var(--text-muted);">
+              😊 مدين لي
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">المبلغ *</label>
+          <input type="number" class="form-input" id="debt-amount" placeholder="0" min="0" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">العملة</label>
+          <select class="form-select" id="debt-currency">
+            <option value="ج.م">ج.م (جنيه)</option>
+            <option value="$">$ (دولار)</option>
+            <option value="€">€ (يورو)</option>
+            <option value="ر.س">ر.س (ريال)</option>
+            <option value="د.إ">د.إ (درهم)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">الوصف (اختياري)</label>
+        <input type="text" class="form-input" id="debt-desc" placeholder="سبب الدين..." maxlength="300" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">تاريخ الاستحقاق (اختياري)</label>
+        <input type="date" class="form-input" id="debt-due" />
+      </div>
+      <div style="display:flex;gap:var(--space-sm);">
+        <button type="submit" class="btn btn-primary" style="flex:1;" id="save-debt-btn">حفظ الدين</button>
+        <button type="button" class="btn btn-secondary" data-modal-close>إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Pay Modal -->
+<div class="modal-overlay" id="pay-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" data-modal-close>✕</button>
+    <h2 class="modal-title">تسجيل دفعة</h2>
+    <div id="pay-debt-info" class="mb-md"></div>
+    <div class="form-group">
+      <label class="form-label">المبلغ المدفوع</label>
+      <input type="number" class="form-input" id="pay-amount" placeholder="0" min="0" />
+    </div>
+    <div style="display:flex;gap:var(--space-sm);">
+      <button class="btn btn-primary" style="flex:1;" onclick="submitPayment()">تأكيد الدفع</button>
+      <button class="btn btn-secondary" onclick="markFullyPaid()">مسدّد كلياً</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+let allDebts = [];
+let currentFilter = 'all';
+let payingDebtId = null;
+
+async function loadDebts() {
+  const container = document.getElementById('debts-container');
+  ui.skeleton(container, 4);
+  try {
+    const data = await api.get('/debts');
+    allDebts = data.debts || [];
+    document.getElementById('total-owe').textContent = (data.totalOwe || 0).toLocaleString('ar-EG') + ' ' + 'ج.م';
+    document.getElementById('total-owed').textContent = (data.totalOwed || 0).toLocaleString('ar-EG') + ' ' + 'ج.م';
+    renderDebts();
+  } catch(e) { toast.error(e.message); }
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
+  renderDebts();
+}
+
+function renderDebts() {
+  const container = document.getElementById('debts-container');
+  let filtered = allDebts;
+  if (currentFilter !== 'all') {
+    if (currentFilter === 'مسدد') filtered = allDebts.filter(d => d.status === 'مسدد');
+    else filtered = allDebts.filter(d => d.type === currentFilter && d.status !== 'مسدد');
+  }
+
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">💰</div><div class="empty-state-title">لا توجد ديون</div><div class="empty-state-desc">اضغط "دين جديد" لإضافة دين</div></div>`;
+    return;
+  }
+
+  const statusLabels = { 'قائم': 'badge-danger', 'مسدد جزئياً': 'badge-warning', 'مسدد': 'badge-success' };
+  const avatarColors = ['#8B1A4A', '#2D7D9A', '#6B8E23', '#8B4513', '#4B0082'];
+
+  container.innerHTML = filtered.map((d, i) => {
+    const isOwe = d.type === 'أنا مدين';
+    const remaining = d.amount - (d.paidAmount || 0);
+    const paidPct = d.amount > 0 ? Math.round((d.paidAmount / d.amount) * 100) : 0;
+    const avatarColor = avatarColors[i % avatarColors.length];
+    return `
+      <div class="debt-card ${d.status === 'مسدد' ? 'settled' : ''}">
+        <div class="debt-top">
+          <div class="debt-person-row">
+            <div class="debt-avatar" style="background:${avatarColor}20;color:${avatarColor};border:2px solid ${avatarColor}40;">
+              ${d.personName[0]}
+            </div>
+            <div>
+              <div class="debt-person font-bold">${d.personName}</div>
+              ${d.description ? `<div class="text-sm text-muted">${d.description}</div>` : ''}
+              ${d.dueDate ? `<div class="text-sm" style="color:var(--warning);">📅 ${dateUtils.formatShort(d.dueDate)}</div>` : ''}
+            </div>
+          </div>
+          <div style="text-align:left;">
+            <div class="${isOwe ? 'debt-owe' : 'debt-owed'} font-bold" style="font-size:var(--font-size-xl);">
+              ${remaining.toLocaleString('ar-EG')} ${d.currency}
+            </div>
+            <div style="text-align:center;"><span class="badge ${statusLabels[d.status] || 'badge-muted'}">${d.status}</span></div>
+          </div>
+        </div>
+
+        ${d.paidAmount > 0 ? `
+          <div class="mt-sm">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span class="text-sm text-muted">المدفوع</span>
+              <span class="text-sm text-success">${paidPct}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${paidPct}%;background:linear-gradient(90deg,var(--success),#90CDB0);"></div></div>
+          </div>
+        ` : ''}
+
+        ${d.status !== 'مسدد' ? `
+          <div style="display:flex;gap:var(--space-sm);margin-top:var(--space-md);">
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="openPayModal('${d._id}','${d.personName}',${d.amount},${d.paidAmount||0},'${d.currency}')">
+              💳 تسجيل دفعة
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteDebt('${d._id}')">🗑️</button>
+          </div>
+        ` : `
+          <div style="margin-top:var(--space-sm);display:flex;justify-content:flex-end;">
+            <button class="btn btn-ghost btn-sm" onclick="deleteDebt('${d._id}')">🗑️ حذف</button>
+          </div>
+        `}
+      </div>
+    `;
+  }).join('');
+}
+
+function openPayModal(id, name, amount, paid, currency) {
+  payingDebtId = id;
+  document.getElementById('pay-debt-info').innerHTML = `
+    <div style="background:var(--bg-secondary);padding:var(--space-md);border-radius:var(--radius-md);">
+      <div class="font-bold">${name}</div>
+      <div class="text-sm text-muted">المتبقي: ${(amount - paid).toLocaleString('ar-EG')} ${currency}</div>
+    </div>
+  `;
+  document.getElementById('pay-amount').value = '';
+  document.getElementById('pay-amount').max = amount - paid;
+  modal.open('pay-modal');
+}
+
+async function submitPayment() {
+  const newPaid = parseFloat(document.getElementById('pay-amount').value);
+  if (!newPaid || newPaid <= 0) { toast.error('أدخل مبلغاً صالحاً'); return; }
+  const debt = allDebts.find(d => d._id === payingDebtId);
+  if (!debt) return;
+  try {
+    await api.put(`/debts/${payingDebtId}`, { paidAmount: (debt.paidAmount || 0) + newPaid });
+    toast.success('تم تسجيل الدفعة ✓');
+    modal.close('pay-modal');
+    loadDebts();
+  } catch(e) { toast.error(e.message); }
+}
+
+async function markFullyPaid() {
+  const debt = allDebts.find(d => d._id === payingDebtId);
+  if (!debt) return;
+  try {
+    await api.put(`/debts/${payingDebtId}`, { paidAmount: debt.amount, status: 'مسدد' });
+    toast.success('✓ تم تسجيل السداد الكامل');
+    modal.close('pay-modal');
+    loadDebts();
+  } catch(e) { toast.error(e.message); }
+}
+
+async function deleteDebt(id) {
+  if (!confirm('هل تريد حذف هذا الدين؟')) return;
+  try {
+    await api.delete(`/debts/${id}`);
+    toast.success('تم الحذف');
+    loadDebts();
+  } catch(e) { toast.error(e.message); }
+}
+
+// Radio button styling
+document.querySelectorAll('input[name="debt-type"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.getElementById('btn-owe').style.borderColor = radio.value === 'أنا مدين' ? 'var(--pink-400)' : 'var(--border)';
+    document.getElementById('btn-owe').style.background = radio.value === 'أنا مدين' ? 'rgba(232,115,154,0.1)' : 'var(--bg-secondary)';
+    document.getElementById('btn-owe').style.color = radio.value === 'أنا مدين' ? 'var(--danger)' : 'var(--text-muted)';
+    document.getElementById('btn-owed').style.borderColor = radio.value === 'مدين لي' ? 'var(--success)' : 'var(--border)';
+    document.getElementById('btn-owed').style.background = radio.value === 'مدين لي' ? 'rgba(104,201,160,0.1)' : 'var(--bg-secondary)';
+    document.getElementById('btn-owed').style.color = radio.value === 'مدين لي' ? 'var(--success)' : 'var(--text-muted)';
+  });
+});
+
+document.getElementById('debt-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('save-debt-btn');
+  ui.setLoading(btn, true);
+  const typeRadio = document.querySelector('input[name="debt-type"]:checked');
+  const payload = {
+    personName: document.getElementById('debt-person').value,
+    amount: parseFloat(document.getElementById('debt-amount').value),
+    currency: document.getElementById('debt-currency').value,
+    type: typeRadio?.value || 'أنا مدين',
+    description: document.getElementById('debt-desc').value,
+    dueDate: document.getElementById('debt-due').value || undefined
+  };
+  try {
+    await api.post('/debts', payload);
+    toast.success('تم إضافة الدين ✓');
+    modal.close('add-debt-modal');
+    e.target.reset();
+    loadDebts();
+  } catch(err) { toast.error(err.message); }
+  finally { ui.setLoading(btn, false); }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildNav();
+  loadDebts();
+});
+</script>
+</body>
+</html>

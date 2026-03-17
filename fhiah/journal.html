@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>حياتي — يومياتي</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .mood-btn {
+      flex: 1;
+      padding: var(--space-sm);
+      border-radius: var(--radius-md);
+      border: 2px solid var(--border);
+      background: var(--bg-secondary);
+      cursor: pointer;
+      font-size: 22px;
+      text-align: center;
+      transition: all var(--transition-fast);
+    }
+    .mood-btn:hover { border-color: var(--border-strong); background: var(--bg-card); }
+    .mood-btn.selected {
+      border-color: var(--pink-400);
+      background: rgba(232,115,154,0.1);
+      box-shadow: 0 0 0 3px rgba(232,115,154,0.15);
+    }
+    .journal-entry-card {
+      padding: var(--space-lg);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      margin-bottom: var(--space-md);
+      cursor: pointer;
+      transition: all var(--transition-base);
+    }
+    .journal-entry-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .journal-card-date { font-size: var(--font-size-sm); color: var(--text-muted); margin-bottom: var(--space-xs); }
+    .journal-card-preview { color: var(--text-secondary); font-size: var(--font-size-sm); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <main class="main-content">
+    <div class="container">
+
+      <div class="page-header animate-fade-in">
+        <div>
+          <h1 class="page-title">يومياتي</h1>
+          <p class="page-subtitle">سجّل يومك واحتفظ بذكرياتك</p>
+        </div>
+        <button class="btn btn-primary" onclick="openWriteModal()">
+          <span>✏️</span> اكتب اليوم
+        </button>
+      </div>
+
+      <!-- Today's Entry Highlight -->
+      <div id="today-entry-section" class="mb-lg"></div>
+
+      <!-- History List -->
+      <div class="section-header">
+        <div class="section-title">📚 السجل السابق</div>
+      </div>
+      <div id="journal-history" class="stagger-children">
+        <div class="skeleton" style="height:90px;margin-bottom:8px;border-radius:16px;"></div>
+        <div class="skeleton" style="height:90px;margin-bottom:8px;border-radius:16px;"></div>
+        <div class="skeleton" style="height:90px;border-radius:16px;"></div>
+      </div>
+
+      <!-- Load More -->
+      <div style="text-align:center;margin-top:var(--space-lg);">
+        <button class="btn btn-secondary" id="load-more-btn" onclick="loadMore()" style="display:none;">تحميل المزيد</button>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Write / Edit Journal Modal -->
+<div class="modal-overlay" id="journal-modal">
+  <div class="modal" style="max-height:95vh;">
+    <div class="modal-handle"></div>
+    <button class="modal-close" data-modal-close>✕</button>
+    <h2 class="modal-title" id="journal-modal-title">يومية اليوم</h2>
+
+    <form id="journal-form">
+      <div class="form-group">
+        <label class="form-label">كيف كان يومك؟</label>
+        <div style="display:flex;gap:var(--space-sm);" id="mood-selector">
+          <button type="button" class="mood-btn" data-mood="ممتاز" title="ممتاز">😄</button>
+          <button type="button" class="mood-btn" data-mood="جيد" title="جيد">😊</button>
+          <button type="button" class="mood-btn selected" data-mood="عادي" title="عادي">😐</button>
+          <button type="button" class="mood-btn" data-mood="سيء" title="سيء">😕</button>
+          <button type="button" class="mood-btn" data-mood="سيء جداً" title="سيء جداً">😢</button>
+        </div>
+        <input type="hidden" id="journal-mood" value="عادي" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">ماذا حدث اليوم؟ *</label>
+        <textarea class="form-textarea" id="journal-content" placeholder="اكتب عن يومك بحرية... ما الذي حدث؟ ما الذي شعرت به؟" required style="min-height:160px;"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">شيء تشكر عليه اليوم 🙏</label>
+        <input type="text" class="form-input" id="journal-gratitude" placeholder="أنا ممتن لـ..." maxlength="500" />
+      </div>
+
+      <div style="display:flex;gap:var(--space-sm);">
+        <button type="submit" class="btn btn-primary" style="flex:1;" id="save-journal-btn">💾 حفظ اليومية</button>
+        <button type="button" class="btn btn-secondary" data-modal-close>إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- View Entry Modal -->
+<div class="modal-overlay" id="view-journal-modal">
+  <div class="modal" style="max-height:90vh;">
+    <div class="modal-handle"></div>
+    <button class="modal-close" data-modal-close>✕</button>
+    <div id="view-journal-content"></div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+const MOODS = { 'ممتاز':'😄', 'جيد':'😊', 'عادي':'😐', 'سيء':'😕', 'سيء جداً':'😢' };
+let currentPage = 1;
+let editingDate = null;
+
+async function loadJournal() {
+  const today = dateUtils.today();
+
+  // Today's entry
+  try {
+    const data = await api.get(`/journal/${today}`);
+    renderTodaySection(data.entry, today);
+  } catch(e) {
+    renderTodaySection(null, today);
+  }
+
+  // History
+  loadHistory(true);
+}
+
+function renderTodaySection(entry, today) {
+  const el = document.getElementById('today-entry-section');
+  if (!entry) {
+    el.innerHTML = `
+      <div class="card" style="background:linear-gradient(135deg,var(--bg-card),var(--bg-elevated));text-align:center;padding:var(--space-xl);">
+        <div style="font-size:40px;margin-bottom:var(--space-sm);">✨</div>
+        <div style="font-size:var(--font-size-lg);font-weight:700;margin-bottom:var(--space-xs);">لم تكتب يوميتك بعد</div>
+        <p class="text-sm text-muted mb-md">${dateUtils.formatArabic(today)}</p>
+        <button class="btn btn-primary" onclick="openWriteModal('${today}')">📝 ابدأ الكتابة</button>
+      </div>
+    `;
+  } else {
+    el.innerHTML = `
+      <div class="card" style="background:linear-gradient(135deg,rgba(139,26,74,0.15),var(--bg-card));cursor:pointer;" onclick="viewEntry('${JSON.stringify(entry).replace(/'/g, "&#39;")}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-md);">
+          <div>
+            <div class="font-bold" style="font-size:var(--font-size-lg);">يومية اليوم</div>
+            <div class="text-sm text-muted">${dateUtils.formatArabic(today)}</div>
+          </div>
+          <div style="font-size:36px;">${MOODS[entry.mood] || '😐'}</div>
+        </div>
+        <p style="font-size:var(--font-size-sm);color:var(--text-secondary);overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">${entry.content}</p>
+        ${entry.gratitude ? `<div class="mt-md" style="background:rgba(212,175,122,0.1);border:1px solid rgba(212,175,122,0.2);border-radius:var(--radius-sm);padding:var(--space-sm) var(--space-md);"><span class="text-sm" style="color:var(--gold);">🙏 ${entry.gratitude}</span></div>` : ''}
+        <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md);">
+          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openWriteModal('${today}', true)">✏️ تعديل</button>
+        </div>
+      </div>
+    `;
+  }
+}
+
+async function loadHistory(reset = false) {
+  if (reset) { currentPage = 1; }
+  const container = document.getElementById('journal-history');
+  if (reset) ui.skeleton(container, 3);
+
+  try {
+    const data = await api.get(`/journal?page=${currentPage}&limit=10`);
+    const entries = data.entries || [];
+    const today = dateUtils.today();
+    const filtered = entries.filter(e => e.date !== today);
+
+    if (reset) container.innerHTML = '';
+
+    if (!filtered.length && reset) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📚</div><div class="empty-state-title">لا توجد يوميات سابقة</div></div>`;
+      return;
+    }
+
+    filtered.forEach(e => {
+      const card = document.createElement('div');
+      card.className = 'journal-entry-card';
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-xs);">
+          <div class="journal-card-date">${dateUtils.formatArabic(e.date)}</div>
+          <span style="font-size:20px;">${MOODS[e.mood] || '😐'}</span>
+        </div>
+        <div class="journal-card-preview">${e.content}</div>
+        ${e.gratitude ? `<div class="mt-sm text-sm" style="color:var(--gold);">🙏 ${e.gratitude}</div>` : ''}
+      `;
+      card.addEventListener('click', () => viewEntry(e));
+      container.appendChild(card);
+    });
+
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    if (data.total > currentPage * 10) {
+      loadMoreBtn.style.display = 'inline-flex';
+    } else {
+      loadMoreBtn.style.display = 'none';
+    }
+  } catch(e) { toast.error(e.message); }
+}
+
+function loadMore() { currentPage++; loadHistory(false); }
+
+function openWriteModal(date = null, isEdit = false) {
+  const today = date || dateUtils.today();
+  editingDate = today;
+  document.getElementById('journal-modal-title').textContent = isEdit ? '✏️ تعديل اليومية' : `📝 ${dateUtils.formatArabic(today)}`;
+
+  if (isEdit) {
+    // Pre-fill from today's data
+    api.get(`/journal/${today}`).then(data => {
+      if (data.entry) {
+        document.getElementById('journal-content').value = data.entry.content;
+        document.getElementById('journal-gratitude').value = data.entry.gratitude || '';
+        document.getElementById('journal-mood').value = data.entry.mood || 'عادي';
+        document.querySelectorAll('.mood-btn').forEach(b => {
+          b.classList.toggle('selected', b.dataset.mood === data.entry.mood);
+        });
+      }
+    });
+  } else {
+    document.getElementById('journal-form').reset();
+    document.getElementById('journal-mood').value = 'عادي';
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.toggle('selected', b.dataset.mood === 'عادي'));
+  }
+
+  modal.open('journal-modal');
+}
+
+function viewEntry(entry) {
+  const e = typeof entry === 'string' ? JSON.parse(entry) : entry;
+  document.getElementById('view-journal-content').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-lg);">
+      <div>
+        <div class="modal-title" style="margin-bottom:0;">${dateUtils.formatArabic(e.date)}</div>
+      </div>
+      <div style="font-size:48px;">${MOODS[e.mood] || '😐'}</div>
+    </div>
+    <p style="font-size:var(--font-size-md);line-height:2;color:var(--text-secondary);white-space:pre-wrap;">${e.content}</p>
+    ${e.gratitude ? `
+      <div class="mt-lg" style="background:rgba(212,175,122,0.1);border:1px solid rgba(212,175,122,0.2);border-radius:var(--radius-md);padding:var(--space-md);">
+        <div class="text-sm font-bold mb-sm" style="color:var(--gold);">🙏 شيء أشكر عليه</div>
+        <p class="text-sm" style="color:var(--gold-light);">${e.gratitude}</p>
+      </div>
+    ` : ''}
+    <div style="margin-top:var(--space-lg);display:flex;gap:var(--space-sm);">
+      <button class="btn btn-secondary btn-sm" onclick="modal.close('view-journal-modal');openWriteModal('${e.date}',true)">✏️ تعديل</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteEntry('${e._id}')">🗑️ حذف</button>
+    </div>
+  `;
+  modal.open('view-journal-modal');
+}
+
+async function deleteEntry(id) {
+  if (!confirm('هل تريد حذف هذه اليومية؟')) return;
+  try {
+    await api.delete(`/journal/${id}`);
+    toast.success('تم الحذف');
+    modal.close('view-journal-modal');
+    loadJournal();
+  } catch(e) { toast.error(e.message); }
+}
+
+// Mood selector
+document.getElementById('mood-selector').addEventListener('click', (e) => {
+  const btn = e.target.closest('.mood-btn');
+  if (!btn) return;
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('journal-mood').value = btn.dataset.mood;
+});
+
+document.getElementById('journal-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('save-journal-btn');
+  ui.setLoading(btn, true);
+  const payload = {
+    date: editingDate || dateUtils.today(),
+    content: document.getElementById('journal-content').value,
+    mood: document.getElementById('journal-mood').value,
+    gratitude: document.getElementById('journal-gratitude').value
+  };
+  try {
+    await api.post('/journal', payload);
+    toast.success('تم حفظ اليومية ✓');
+    modal.close('journal-modal');
+    loadJournal();
+  } catch(err) { toast.error(err.message); }
+  finally { ui.setLoading(btn, false); }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildNav();
+  loadJournal();
+});
+</script>
+</body>
+</html>

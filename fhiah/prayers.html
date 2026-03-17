@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>حياتي — الصلوات</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .prayer-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-lg) var(--space-xl);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      margin-bottom: var(--space-md);
+      cursor: pointer;
+      transition: all var(--transition-base);
+      position: relative;
+      overflow: hidden;
+    }
+    .prayer-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(139,26,74,0.15), rgba(232,115,154,0.05));
+      opacity: 0;
+      transition: opacity var(--transition-base);
+    }
+    .prayer-card:hover::before { opacity: 1; }
+    .prayer-card.done {
+      border-color: rgba(139,26,74,0.4);
+      background: linear-gradient(135deg, rgba(139,26,74,0.15), rgba(56,22,42,0.8));
+    }
+    .prayer-card.done::after {
+      content: '✓';
+      position: absolute;
+      left: var(--space-xl);
+      top: 50%; transform: translateY(-50%);
+      font-size: 28px;
+      color: var(--pink-400);
+      font-weight: 800;
+    }
+    .prayer-name { font-size: var(--font-size-2xl); font-weight: 800; }
+    .prayer-time { font-size: var(--font-size-sm); color: var(--text-muted); margin-top: 4px; }
+    .prayer-icon { font-size: 40px; opacity: 0.8; }
+    .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .month-cell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+    .cell-full    { background: linear-gradient(135deg, var(--burgundy-500), var(--pink-400)); color: white; }
+    .cell-partial { background: rgba(139,26,74,0.3); color: var(--pink-300); }
+    .cell-empty   { background: var(--bg-elevated); color: var(--text-disabled); }
+    .cell-future  { background: transparent; border: 1px solid var(--border); color: var(--text-disabled); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <main class="main-content">
+    <div class="container">
+
+      <div class="page-header animate-fade-in">
+        <div>
+          <h1 class="page-title">الصلوات</h1>
+          <p class="page-subtitle" id="prayers-date-label"></p>
+        </div>
+        <div style="display:flex;gap:var(--space-sm);">
+          <button class="btn btn-ghost btn-icon" onclick="changeDate(-1)">◀</button>
+          <button class="btn btn-secondary btn-sm" onclick="goToToday()">اليوم</button>
+          <button class="btn btn-ghost btn-icon" onclick="changeDate(1)">▶</button>
+        </div>
+      </div>
+
+      <!-- Overall Progress -->
+      <div class="card mb-lg animate-fade-in" style="text-align:center;background:linear-gradient(135deg,var(--bg-card),var(--bg-elevated));">
+        <div style="font-size:var(--font-size-4xl);font-weight:900;background:linear-gradient(135deg,var(--text-primary),var(--pink-300));-webkit-background-clip:text;-webkit-text-fill-color:transparent;" id="prayer-score">0/5</div>
+        <div style="color:var(--text-muted);font-size:var(--font-size-sm);margin-top:4px;">صلوات اليوم</div>
+        <div class="progress-bar mt-md">
+          <div class="progress-fill" id="prayer-main-progress" style="width:0%;height:8px;"></div>
+        </div>
+      </div>
+
+      <!-- Prayer Cards -->
+      <div id="prayers-container" class="stagger-children"></div>
+
+      <!-- Monthly Stats -->
+      <div class="card mt-lg">
+        <div class="card-header">
+          <div class="card-title"><div class="card-icon" style="background:rgba(139,26,74,0.2);">📊</div> إحصائيات الشهر</div>
+        </div>
+        <div id="month-stats" style="color:var(--text-muted);font-size:var(--font-size-sm);text-align:center;padding:var(--space-md);">جاري التحميل...</div>
+        <div class="month-grid mt-md" id="month-grid"></div>
+        <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md);flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;"><div style="width:12px;height:12px;border-radius:3px;background:linear-gradient(135deg,var(--burgundy-500),var(--pink-400));"></div><span class="text-sm">5/5</span></div>
+          <div style="display:flex;align-items:center;gap:6px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(139,26,74,0.3);"></div><span class="text-sm">جزئي</span></div>
+          <div style="display:flex;align-items:center;gap:6px;"><div style="width:12px;height:12px;border-radius:3px;background:var(--bg-elevated);"></div><span class="text-sm">لا شيء</span></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+const PRAYERS = [
+  { key: 'fajr',    name: 'الفجر',   time: 'قبل الشروق', icon: '🌅' },
+  { key: 'dhuhr',   name: 'الظهر',   time: 'بعد الزوال', icon: '☀️' },
+  { key: 'asr',     name: 'العصر',   time: 'بعد الظهيرة', icon: '🌤️' },
+  { key: 'maghrib', name: 'المغرب',  time: 'بعد الغروب', icon: '🌇' },
+  { key: 'isha',    name: 'العشاء',  time: 'الليل',       icon: '🌙' },
+];
+
+let currentDate = dateUtils.today();
+let prayerData = null;
+
+async function loadPrayers() {
+  document.getElementById('prayers-date-label').textContent = dateUtils.formatArabic(currentDate);
+
+  try {
+    const data = await api.get(`/prayers/${currentDate}`);
+    prayerData = data.prayers;
+    renderPrayerCards(prayerData);
+    loadMonthlyStats();
+  } catch(e) {
+    toast.error(e.message);
+  }
+}
+
+function renderPrayerCards(prayers) {
+  const container = document.getElementById('prayers-container');
+  let completed = 0;
+
+  container.innerHTML = PRAYERS.map(p => {
+    const done = prayers?.[p.key]?.completed || false;
+    if (done) completed++;
+    return `
+      <div class="prayer-card ${done ? 'done' : ''}" onclick="togglePrayer('${p.key}')">
+        <div>
+          <div class="prayer-name">${p.name}</div>
+          <div class="prayer-time">${p.time}</div>
+        </div>
+        <div class="prayer-icon">${p.icon}</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('prayer-score').textContent = `${completed}/5`;
+  document.getElementById('prayer-main-progress').style.width = `${(completed/5)*100}%`;
+}
+
+async function togglePrayer(key) {
+  const done = prayerData?.[key]?.completed || false;
+  try {
+    const data = await api.put(`/prayers/${currentDate}`, { [key]: { completed: !done } });
+    prayerData = data.prayers;
+    renderPrayerCards(prayerData);
+    const p = PRAYERS.find(x => x.key === key);
+    toast.success(!done ? `${p.name} ${p.icon} — تم تسجيلها` : `${p.name} — تم الإلغاء`);
+  } catch(e) { toast.error(e.message); }
+}
+
+async function loadMonthlyStats() {
+  const month = currentDate.slice(0, 7);
+  try {
+    const data = await api.get(`/prayers?month=${month}`);
+    const records = data.records || [];
+    let total5 = 0, totalPrayers = 0, totalDays = records.length;
+    const byDate = {};
+
+    records.forEach(r => {
+      let count = 0;
+      PRAYERS.forEach(p => { if (r[p.key]?.completed) { count++; totalPrayers++; } });
+      if (count === 5) total5++;
+      byDate[r.date] = count;
+    });
+
+    document.getElementById('month-stats').innerHTML = `
+      <div style="display:flex;gap:var(--space-xl);justify-content:center;flex-wrap:wrap;">
+        <div><div style="font-size:var(--font-size-2xl);font-weight:800;color:var(--pink-400);">${total5}</div><div>أيام مكتملة</div></div>
+        <div><div style="font-size:var(--font-size-2xl);font-weight:800;color:var(--gold);">${totalPrayers}</div><div>إجمالي الصلوات</div></div>
+        <div><div style="font-size:var(--font-size-2xl);font-weight:800;color:var(--success);">${totalDays > 0 ? Math.round((totalPrayers / (totalDays * 5)) * 100) : 0}%</div><div>نسبة الإنجاز</div></div>
+      </div>
+    `;
+
+    renderMonthGrid(month, byDate);
+  } catch(e) { /* silent */ }
+}
+
+function renderMonthGrid(month, byDate) {
+  const grid = document.getElementById('month-grid');
+  const today = dateUtils.today();
+  const daysInMonth = new Date(month + '-01');
+  const totalDays = new Date(daysInMonth.getFullYear(), daysInMonth.getMonth() + 1, 0).getDate();
+  const cells = [];
+
+  for (let d = 1; d <= totalDays; d++) {
+    const dateStr = `${month}-${String(d).padStart(2, '0')}`;
+    const isFuture = dateStr > today;
+    const count = byDate[dateStr] ?? -1;
+    let cls = 'cell-future';
+    if (!isFuture) {
+      if (count === 5) cls = 'cell-full';
+      else if (count > 0) cls = 'cell-partial';
+      else cls = 'cell-empty';
+    }
+    cells.push(`<div class="month-cell ${cls}" title="${dateStr}: ${count >= 0 ? count + '/5' : '-'}">${d}</div>`);
+  }
+
+  grid.innerHTML = cells.join('');
+}
+
+function changeDate(days) {
+  const d = new Date(currentDate);
+  d.setDate(d.getDate() + days);
+  currentDate = d.toISOString().split('T')[0];
+  loadPrayers();
+}
+
+function goToToday() {
+  currentDate = dateUtils.today();
+  loadPrayers();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildNav();
+  loadPrayers();
+});
+</script>
+</body>
+</html>

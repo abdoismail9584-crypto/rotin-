@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>حياتي — العادات</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .habit-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-md);
+      transition: all var(--transition-base);
+    }
+    .habit-card:hover { border-color: var(--border-strong); }
+    .habit-card.done-today { border-color: rgba(139,26,74,0.4); background: linear-gradient(135deg, rgba(139,26,74,0.12), var(--bg-card)); }
+    .habit-top { display: flex; align-items: center; gap: var(--space-md); }
+    .habit-big-icon { width: 52px; height: 52px; border-radius: var(--radius-md); display: grid; place-items: center; font-size: 26px; flex-shrink: 0; }
+    .habit-streak-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(212,175,122,0.12); border: 1px solid rgba(212,175,122,0.25); border-radius: var(--radius-full); padding: 2px 10px; font-size: var(--font-size-xs); color: var(--gold); font-weight: 700; }
+    .week-dots { display: flex; gap: 4px; margin-top: var(--space-sm); }
+    .week-dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 700; }
+    .week-dot.done-d   { background: linear-gradient(135deg, var(--burgundy-400), var(--pink-400)); color: white; }
+    .week-dot.miss-d   { background: var(--bg-elevated); color: var(--text-disabled); }
+    .week-dot.future-d { background: transparent; border: 1px solid var(--border); color: var(--text-disabled); }
+    .icon-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: var(--space-sm); margin-bottom: var(--space-md); }
+    .icon-btn { font-size: 22px; padding: 8px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--bg-secondary); cursor: pointer; text-align: center; transition: all var(--transition-fast); }
+    .icon-btn:hover { border-color: var(--pink-400); background: var(--bg-card); }
+    .icon-btn.selected { border-color: var(--pink-400); background: rgba(232,115,154,0.15); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <main class="main-content">
+    <div class="container">
+
+      <div class="page-header animate-fade-in">
+        <div>
+          <h1 class="page-title">العادات</h1>
+          <p class="page-subtitle">بناء عادات صغيرة، نتائج كبيرة</p>
+        </div>
+        <button class="btn btn-primary" onclick="modal.open('add-habit-modal')">
+          <span>＋</span> عادة جديدة
+        </button>
+      </div>
+
+      <!-- Today's Progress Banner -->
+      <div class="card mb-lg animate-fade-in" id="habits-today-progress" style="background:linear-gradient(135deg,var(--bg-card),var(--bg-elevated));">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-md);">
+          <div class="font-bold">إنجاز اليوم</div>
+          <div id="habits-today-count" class="font-bold text-pink">0/0</div>
+        </div>
+        <div class="progress-bar" style="height:8px;"><div class="progress-fill" id="habits-today-fill" style="width:0%;"></div></div>
+      </div>
+
+      <!-- Habits List -->
+      <div id="habits-container" class="stagger-children"></div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Add Habit Modal -->
+<div class="modal-overlay" id="add-habit-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" data-modal-close>✕</button>
+    <h2 class="modal-title">عادة جديدة</h2>
+    <form id="habit-form">
+      <div class="form-group">
+        <label class="form-label">اسم العادة *</label>
+        <input type="text" class="form-input" id="habit-title" placeholder="مثال: قراءة 20 دقيقة" required maxlength="100" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">الوصف (اختياري)</label>
+        <input type="text" class="form-input" id="habit-desc" placeholder="تفاصيل..." maxlength="300" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">اختر أيقونة</label>
+        <div class="icon-grid" id="icon-grid">
+          ${['📚','🏃','💪','🧘','💧','🍎','✍️','🎵','🌱','😴','🧹','💻','🎯','🙏','❤️','⭐'].map(i =>
+            `<div class="icon-btn ${i==='⭐'?'selected':''}" data-icon="${i}" onclick="selectIcon(this)">${i}</div>`
+          ).join('')}
+        </div>
+        <input type="hidden" id="habit-icon" value="⭐" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">التكرار</label>
+        <select class="form-select" id="habit-freq">
+          <option value="يومي">📅 يومي</option>
+          <option value="أسبوعي">📆 أسبوعي</option>
+          <option value="شهري">🗓️ شهري</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:var(--space-sm);">
+        <button type="submit" class="btn btn-primary" style="flex:1;" id="save-habit-btn">حفظ العادة</button>
+        <button type="button" class="btn btn-secondary" data-modal-close>إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+const WEEKDAYS_AR = ['أحد','اثن','ثلا','أرب','خمي','جمع','سبت'];
+let habits = [];
+const today = dateUtils.today();
+
+async function loadHabits() {
+  const container = document.getElementById('habits-container');
+  ui.skeleton(container, 4);
+  try {
+    const data = await api.get('/habits');
+    habits = data.habits || [];
+    renderHabits();
+    updateTodayProgress();
+  } catch(e) { toast.error(e.message); }
+}
+
+function renderHabits() {
+  const container = document.getElementById('habits-container');
+  if (!habits.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⭐</div>
+        <div class="empty-state-title">لا توجد عادات بعد</div>
+        <div class="empty-state-desc">ابدأ ببناء عادة صغيرة يومية</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = habits.map(h => {
+    const todayComp = h.completions?.find(c => c.date === today);
+    const doneTodayBool = todayComp?.completed || false;
+
+    // Last 7 days
+    const last7 = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ds = d.toISOString().split('T')[0];
+      const comp = h.completions?.find(c => c.date === ds);
+      last7.push({ date: ds, day: WEEKDAYS_AR[d.getDay()], done: comp?.completed || false, isFuture: ds > today });
+    }
+
+    return `
+      <div class="habit-card ${doneTodayBool ? 'done-today' : ''}" data-id="${h._id}">
+        <div class="habit-top">
+          <div class="habit-big-icon" style="background:rgba(139,26,74,0.15);border:1px solid rgba(139,26,74,0.3);">
+            ${h.icon || '⭐'}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:var(--space-sm);flex-wrap:wrap;">
+              <div class="font-bold ${doneTodayBool ? '' : ''}" style="${doneTodayBool ? 'text-decoration:line-through;color:var(--text-muted);' : ''}">${h.title}</div>
+              ${h.streak > 0 ? `<span class="habit-streak-badge">🔥 ${h.streak}</span>` : ''}
+            </div>
+            ${h.description ? `<div class="text-sm text-muted" style="margin-top:2px;">${h.description}</div>` : ''}
+            <div class="week-dots mt-sm">
+              ${last7.map(d => `
+                <div class="week-dot ${d.isFuture ? 'future-d' : d.done ? 'done-d' : 'miss-d'}" title="${d.date}">
+                  ${d.day}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:var(--space-sm);">
+            <label class="checkbox-toggle">
+              <input type="checkbox" ${doneTodayBool ? 'checked' : ''} onchange="toggleHabit('${h._id}', today, this.checked)">
+              <div class="checkbox-box" style="width:28px;height:28px;border-radius:8px;"></div>
+            </label>
+            <button class="btn btn-ghost btn-icon btn-sm" onclick="archiveHabit('${h._id}')" title="أرشفة" style="font-size:14px;">🗑️</button>
+          </div>
+        </div>
+        ${h.longestStreak > 0 ? `<div class="text-sm text-muted mt-sm">أطول سلسلة: ${h.longestStreak} يوم 🏆</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function updateTodayProgress() {
+  const done = habits.filter(h => h.completions?.find(c => c.date === today)?.completed).length;
+  const total = habits.length;
+  document.getElementById('habits-today-count').textContent = `${done}/${total}`;
+  document.getElementById('habits-today-fill').style.width = total > 0 ? `${(done/total)*100}%` : '0%';
+}
+
+async function toggleHabit(id, date, completed) {
+  try {
+    const data = await api.put(`/habits/${id}/complete`, { date: today, completed });
+    toast.success(completed ? '✓ عادة منجزة' : 'تم الإلغاء');
+    // Update local state
+    const habit = habits.find(h => h._id === id);
+    if (habit) {
+      const idx = habit.completions?.findIndex(c => c.date === today);
+      if (idx >= 0) habit.completions[idx].completed = completed;
+      else habit.completions = [...(habit.completions||[]), { date: today, completed }];
+      habit.streak = data.habit.streak;
+      habit.longestStreak = data.habit.longestStreak;
+    }
+    renderHabits();
+    updateTodayProgress();
+  } catch(e) { toast.error(e.message); }
+}
+
+async function archiveHabit(id) {
+  if (!confirm('هل تريد أرشفة هذه العادة؟')) return;
+  try {
+    await api.delete(`/habits/${id}`);
+    toast.success('تم الأرشفة');
+    loadHabits();
+  } catch(e) { toast.error(e.message); }
+}
+
+function selectIcon(el) {
+  document.querySelectorAll('.icon-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('habit-icon').value = el.dataset.icon;
+}
+
+document.getElementById('habit-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('save-habit-btn');
+  ui.setLoading(btn, true);
+  const payload = {
+    title: document.getElementById('habit-title').value,
+    description: document.getElementById('habit-desc').value,
+    icon: document.getElementById('habit-icon').value,
+    frequency: document.getElementById('habit-freq').value
+  };
+  try {
+    await api.post('/habits', payload);
+    toast.success('تم إضافة العادة ✓');
+    modal.close('add-habit-modal');
+    e.target.reset();
+    document.querySelectorAll('.icon-btn').forEach(b => b.classList.toggle('selected', b.dataset.icon === '⭐'));
+    document.getElementById('habit-icon').value = '⭐';
+    loadHabits();
+  } catch(err) { toast.error(err.message); }
+  finally { ui.setLoading(btn, false); }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildNav();
+  loadHabits();
+});
+</script>
+</body>
+</html>
